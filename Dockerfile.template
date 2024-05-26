@@ -1,0 +1,11 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+
+RUN chmod  -R 755 /app  \
+    && pip config set global.extra-index-url "https://mirrors.cernet.edu.cn/pypi/web/simple" \
+    && pip install --no-cache-dir  -r requirements.txt
+
+EXPOSE 80
