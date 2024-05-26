@@ -2,26 +2,24 @@
 
 set -e # Exit immediately if a command exits with a non-zero status.
 
+# Define the configuration file path
+CONFIG_FILE="config.yaml"
+
+# Source the parse.sh script to read configuration from config.yaml
+source ./parse.sh
+
 # Define the base Dockerfile path
-DOCKERFILE_TEMPLATE="Dockerfile.template"
+DOCKERFILE_TEMPLATE="$DOCKERFILE_TEMPLATE"
 
 # Define the output directory for Dockerfiles
-OUTPUT_DIR="./dockerfiles"
+OUTPUT_DIR="$OUTPUT_DIR"
 
 # Define the base images and corresponding tags
-BASE_IMAGES=(
-    "python:3.11-alpine"
-    "python:3.11-slim"
-)
+BASE_IMAGES=("${BASE_IMAGES[@]}")
+TAG_SUFFIXES=("${TAG_SUFFIXES[@]}")
 
-TAG_PREFIX="oaklight/service_api_base"
-TAG_SUFFIXES=(
-    "3.11-alpine"
-    "3.11-slim"
-    "alpine"
-    "slim"
-    "latest"
-)
+# Define the tag prefix
+TAG_PREFIX="$TAG_PREFIX"
 
 # Create output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
@@ -93,28 +91,47 @@ clean_up() {
     docker builder prune -f
 }
 
+# Default to cleaning up
+CLEAN_UP=true
+
+# Process command-line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+    --no-clean)
+        CLEAN_UP=false
+        shift # Remove --no-clean from processing
+        ;;
+    *)
+        echo "Unknown argument: $1"
+        exit 1
+        ;;
+    esac
+done
+
 # Main script execution
 {
-    # Create and build Dockerfiles for each base image and tag suffix
-    for base_image in "${BASE_IMAGES[@]}"; do
-        for tag_suffix in "${TAG_SUFFIXES[@]}"; do
-            create_dockerfile "$base_image" "$tag_suffix"
-            build_image "$TAG_PREFIX:$tag_suffix"
-        done
+    # Loop over base images and their corresponding tags
+    for i in "${!BASE_IMAGES[@]}"; do
+        create_dockerfile "${BASE_IMAGES[$i]}" "${TAG_SUFFIXES[$i]}"
+        build_image "$TAG_PREFIX:${TAG_SUFFIXES[$i]}"
     done
 
     # Tag additional versions and push
-    docker tag "$TAG_PREFIX:3.11-alpine" "$TAG_PREFIX:alpine"
-    docker tag "$TAG_PREFIX:3.11-alpine" "$TAG_PREFIX:latest"
-    docker tag "$TAG_PREFIX:3.11-slim" "$TAG_PREFIX:slim"
-
-    # Push all images
     for tag_suffix in "${TAG_SUFFIXES[@]}"; do
-        push_image "$TAG_PREFIX:$tag_suffix"
+        tag="$TAG_PREFIX:$tag_suffix"
+        short_tag="$TAG_PREFIX:${tag_suffix##*-}" # Tag without version
+        docker tag "$tag" "$short_tag"
+        push_image "$tag"
     done
 
-    # Clean up after build and push
-    clean_up
+    # Push the 'latest' tag
+    docker tag "$TAG_PREFIX:${TAG_SUFFIXES[-1]##*-}" "$TAG_PREFIX:latest"
+    push_image "$TAG_PREFIX:latest"
+
+    # Clean up after build and push if --no-clean is not specified
+    if $CLEAN_UP; then
+        clean_up
+    fi
 
 } || {
     echo "An error occurred."

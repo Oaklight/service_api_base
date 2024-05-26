@@ -1,0 +1,9 @@
+output_dir: "dockerfiles"
+dockerfile_template: "Dockerfile.template"
+tag_prefix: "oaklight/service_api_base"
+tag_latest: "alpine" # Indicate which tag to rename to latest
+base_images:
+  - base_image: "python:3.11-slim"
+    tag_suffix: "3.11-slim"
+  - base_image: "python:3.11-alpine"
+    tag_suffix: "3.11-alpine"
